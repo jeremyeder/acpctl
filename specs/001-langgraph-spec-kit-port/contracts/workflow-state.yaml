@@ -1,0 +1,222 @@
+openapi: 3.0.0
+info:
+  title: acpctl Workflow State Contract
+  version: 1.0.0
+  description: |
+    Contract defining the LangGraph workflow state structure passed between agents.
+    This state is serialized to JSON for checkpoints and must be fully JSON-compatible.
+
+components:
+  schemas:
+    ACPState:
+      type: object
+      description: Complete workflow state passed between LangGraph agents
+      required:
+        - constitution
+        - governance_passes
+        - feature_description
+        - validation_status
+        - error_count
+      properties:
+        # Constitution layer
+        constitution:
+          type: string
+          description: Entire constitution.md content
+          minLength: 1
+          example: "# acpctl Constitution\n\n## Core Principles\n..."
+
+        governance_passes:
+          type: boolean
+          description: True if no constitutional violations
+          default: false
+
+        # Specification layer
+        feature_description:
+          type: string
+          description: Natural language input from user
+          example: "Add OAuth2 authentication for user login"
+
+        spec:
+          type: string
+          description: Generated spec.md content
+          default: ""
+
+        clarifications:
+          type: array
+          description: Answers from pre-flight questionnaire
+          items:
+            type: string
+            minLength: 1
+          default: []
+          maxItems: 10
+
+        # Planning layer
+        unknowns:
+          type: array
+          description: Research questions (empty after Phase 0)
+          items:
+            type: string
+          default: []
+
+        research:
+          type: string
+          description: research.md content
+          default: ""
+
+        plan:
+          type: string
+          description: plan.md content
+          default: ""
+
+        data_model:
+          type: string
+          description: data-model.md content
+          default: ""
+
+        contracts:
+          type: object
+          description: Contract file paths to content mapping
+          additionalProperties:
+            type: string
+          default: {}
+          example:
+            "contracts/cli-interface.yaml": "openapi: 3.0.0..."
+            "contracts/workflow-state.yaml": "openapi: 3.0.0..."
+
+        # Implementation layer
+        tasks:
+          type: array
+          description: Task definitions with dependencies
+          items:
+            $ref: '#/components/schemas/Task'
+          default: []
+
+        completed_tasks:
+          type: array
+          description: Task IDs that finished successfully
+          items:
+            type: string
+          default: []
+
+        code_artifacts:
+          type: object
+          description: File paths to code content mapping
+          additionalProperties:
+            type: string
+          default: {}
+          example:
+            "acpctl/core/workflow.py": "from langgraph.graph import StateGraph..."
+            "tests/unit/test_workflow.py": "import pytest..."
+
+        validation_status:
+          type: string
+          description: Overall workflow validation state
+          enum:
+            - PENDING
+            - PASS
+            - FAIL
+          default: PENDING
+
+        # Error handling
+        error:
+          type: object
+          nullable: true
+          description: Error details if phase failed
+          properties:
+            node:
+              type: string
+              description: Agent node that failed
+            message:
+              type: string
+              description: Error message
+            count:
+              type: integer
+              description: Number of retry attempts
+          example:
+            node: "governance_agent"
+            message: "Constitution file not found"
+            count: 1
+
+        error_count:
+          type: integer
+          description: Total number of errors encountered
+          default: 0
+          minimum: 0
+          maximum: 3
+
+    Task:
+      type: object
+      description: Single implementation task with dependencies
+      required:
+        - task_id
+        - description
+        - type
+      properties:
+        task_id:
+          type: string
+          description: Unique task identifier
+          example: "task-001"
+
+        description:
+          type: string
+          description: What needs to be implemented
+          example: "Create ACPState TypedDict in core/state.py"
+
+        type:
+          type: string
+          enum:
+            - SETUP
+            - MODEL
+            - AGENT
+            - TEST
+            - INTEGRATION
+          description: Task category
+
+        dependencies:
+          type: array
+          description: Task IDs that must complete before this task
+          items:
+            type: string
+          default: []
+          example: ["task-000"]
+
+        status:
+          type: string
+          enum:
+            - PENDING
+            - IN_PROGRESS
+            - COMPLETED
+            - FAILED
+          default: PENDING
+
+        artifacts:
+          type: array
+          description: File paths produced by this task
+          items:
+            type: string
+          example:
+            - "acpctl/core/state.py"
+            - "tests/unit/test_state.py"
+
+    StateTransitionRule:
+      type: object
+      description: Validation rule for state transitions
+      properties:
+        rule_id:
+          type: string
+        condition:
+          type: string
+          description: Python expression that must be true
+          example: "state.get('governance_passes') == True"
+        error_message:
+          type: string
+          example: "Cannot specify without passing governance"
+        phase:
+          type: string
+          enum:
+            - INIT
+            - SPECIFICATION
+            - PLANNING
+            - IMPLEMENTATION
+
+paths: {}  # No HTTP endpoints - this is state schema only

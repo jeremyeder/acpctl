@@ -1,0 +1,415 @@
+openapi: 3.0.0
+info:
+  title: acpctl CLI Interface Contract
+  version: 1.0.0
+  description: |
+    Contract defining the command-line interface for acpctl.
+    This is not an HTTP API but a CLI specification using OpenAPI format for consistency.
+    All commands are synchronous CLI invocations with exit codes and text output.
+
+paths:
+  /init:
+    post:
+      summary: Initialize project with constitutional governance
+      description: |
+        Creates .acp/ directory structure with constitutional template.
+        Idempotent: detects existing setup and prompts for confirmation.
+      operationId: init
+      tags:
+        - Workflow
+      parameters:
+        - name: verbose
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Enable verbose output
+        - name: quiet
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Suppress all output except errors
+      responses:
+        '0':
+          description: Success - constitution template created
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  ✓ Created .acp/templates/constitution.md
+                  Next: Edit constitution to define project principles
+        '1':
+          description: Error - operation failed
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  ERROR: .acp/ already exists. Use --force to overwrite.
+
+  /specify:
+    post:
+      summary: Generate feature specification with pre-flight questions
+      description: |
+        Accepts natural language feature description, identifies ambiguities,
+        collects clarifications upfront, generates spec.md with constitutional validation.
+      operationId: specify
+      tags:
+        - Workflow
+      parameters:
+        - name: description
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Natural language feature description
+        - name: verbose
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: quiet
+          in: query
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        description: Pre-flight questionnaire answers (interactive prompt if not provided)
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clarifications:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      question:
+                        type: string
+                      answer:
+                        type: string
+      responses:
+        '0':
+          description: Success - specification generated and validated
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  ✓ Pre-flight questionnaire: 5 questions answered
+                  ✓ Specification generated: specs/001-feature/spec.md
+                  ✓ Constitutional validation: PASS
+                  Next: Run 'acpctl plan' to generate implementation plan
+        '1':
+          description: Error - constitutional violations detected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [VIOLATION_DETECTED]
+                  violations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConstitutionalViolation'
+                  options:
+                    type: array
+                    items:
+                      type: string
+                      enum: [REGENERATE, EDIT_CONSTITUTION, ABORT, IGNORE_FORCE]
+
+  /plan:
+    post:
+      summary: Generate implementation plan with architecture validation
+      description: |
+        Generates plan.md, data-model.md, and contracts/ from approved specification.
+        Includes Phase 0 research and Phase 1 design artifacts.
+      operationId: plan
+      tags:
+        - Workflow
+      parameters:
+        - name: spec_id
+          in: query
+          schema:
+            type: string
+          description: Feature ID (auto-detected if in feature branch)
+        - name: verbose
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: quiet
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '0':
+          description: Success - planning artifacts generated
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  ✓ Phase 0: Research complete (research.md)
+                  ✓ Phase 1: Plan generated (plan.md)
+                  ✓ Phase 1: Data model generated (data-model.md)
+                  ✓ Phase 1: Contracts generated (contracts/*.yaml)
+                  ✓ Constitutional validation: PASS
+                  Next: Run 'acpctl implement' to generate code
+        '1':
+          description: Error - unresolved clarifications or violations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [NEEDS_CLARIFICATION, VIOLATION_DETECTED]
+                  details:
+                    type: string
+
+  /implement:
+    post:
+      summary: Generate code following test-driven development
+      description: |
+        Generates test files first, then implementation files that make tests pass.
+        Validates all code against constitutional principles.
+      operationId: implement
+      tags:
+        - Workflow
+      parameters:
+        - name: spec_id
+          in: query
+          schema:
+            type: string
+        - name: verbose
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: quiet
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '0':
+          description: Success - code generated and tests passing
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  ✓ Test files generated: 12 tests
+                  ✓ Implementation files generated: 8 modules
+                  ✓ All tests passing (100% pass rate)
+                  ✓ Constitutional validation: PASS
+                  Next: Review generated code and commit changes
+        '1':
+          description: Error - tests failing or violations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [TESTS_FAILING, VIOLATION_DETECTED]
+                  test_results:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      passed:
+                        type: integer
+                      failed:
+                        type: integer
+                      failures:
+                        type: array
+                        items:
+                          type: object
+
+  /status:
+    get:
+      summary: Show current workflow status
+      description: |
+        Displays active phase, last checkpoint, and completion state of each stage.
+      operationId: status
+      tags:
+        - Management
+      parameters:
+        - name: spec_id
+          in: query
+          schema:
+            type: string
+          description: Feature ID (shows all if not specified)
+      responses:
+        '0':
+          description: Success - status displayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowStatus'
+
+  /resume:
+    post:
+      summary: Resume interrupted workflow from checkpoint
+      description: |
+        Loads saved state, skips completed phases, continues from next incomplete phase.
+      operationId: resume
+      tags:
+        - Management
+      parameters:
+        - name: spec_id
+          in: query
+          schema:
+            type: string
+          description: Feature ID to resume (auto-detects last if not specified)
+        - name: verbose
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: quiet
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '0':
+          description: Success - workflow resumed and completed
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  Resuming workflow 001-feature from checkpoint: PLANNING_COMPLETE
+                  Skipping phases: INIT, SPECIFICATION
+                  Continuing from: IMPLEMENTATION
+                  ...
+        '1':
+          description: Error - no checkpoint found or corrupted
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /history:
+    get:
+      summary: List all workflow runs
+      description: |
+        Displays all specifications with identifiers, status, and timestamps.
+      operationId: history
+      tags:
+        - Management
+      responses:
+        '0':
+          description: Success - history displayed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowSummary'
+
+components:
+  schemas:
+    ConstitutionalViolation:
+      type: object
+      required:
+        - principle
+        - location
+        - description
+        - suggested_fix
+      properties:
+        principle:
+          type: string
+          description: Which constitutional principle was violated
+          example: "I. Specifications as First-Class Artifacts"
+        location:
+          type: object
+          properties:
+            file:
+              type: string
+            line:
+              type: integer
+          example:
+            file: "specs/001-feature/spec.md"
+            line: 42
+        description:
+          type: string
+          description: What the violation is
+          example: "Specification contains implementation detail: 'PostgreSQL database'"
+        suggested_fix:
+          type: string
+          description: Actionable correction
+          example: "Remove database technology; describe data needs: 'persistent storage for user records'"
+
+    WorkflowStatus:
+      type: object
+      properties:
+        feature_id:
+          type: string
+          example: "001-feature"
+        feature_name:
+          type: string
+          example: "langgraph-spec-kit-port"
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, PAUSED, COMPLETED, FAILED]
+          example: "IN_PROGRESS"
+        current_phase:
+          type: string
+          enum: [INIT, SPECIFICATION, PLANNING, IMPLEMENTATION]
+          example: "PLANNING"
+        last_checkpoint:
+          type: string
+          example: "SPECIFICATION_COMPLETE"
+        phases_completed:
+          type: array
+          items:
+            type: string
+          example: ["INIT", "SPECIFICATION"]
+        next_phase:
+          type: string
+          example: "PLANNING"
+        created_at:
+          type: string
+          format: date-time
+        last_updated:
+          type: string
+          format: date-time
+
+    WorkflowSummary:
+      type: object
+      properties:
+        feature_id:
+          type: string
+        feature_name:
+          type: string
+        status:
+          type: string
+          enum: [CREATED, IN_PROGRESS, PAUSED, COMPLETED, FAILED]
+        created_at:
+          type: string
+          format: date-time
+        last_checkpoint:
+          type: string
+        checkpoint_available:
+          type: boolean
+          description: Can this workflow be resumed?
+
+  securitySchemes: {}
+
+tags:
+  - name: Workflow
+    description: Main workflow phase commands
+  - name: Management
+    description: Status and resume commands
