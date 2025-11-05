@@ -1,0 +1,24 @@
+[project]
+name = "acpctl"
+version = "0.1.0"
+description = "Ambient Code Platform control - LangGraph workflow CLI for spec-driven development"
+requires-python = ">=3.11"
+dependencies = [
+    "typer",
+    "rich",
+    "click",
+    "pyyaml>=6.0",
+    "langgraph>=0.0.55",
+    "langchain-core>=0.1.52",
+    "langchain-anthropic>=0.1.18",
+]
+
+[project.scripts]
+acpctl = "acpctl.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/acpctl", "src/acpctl_workflows"]
