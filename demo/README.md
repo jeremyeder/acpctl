@@ -2,6 +2,12 @@
 
 This directory contains an asciinema recording demonstrating the proposed UX for **acpctl** (Ambient Code Platform CLI), the Phase 1 implementation of the spec-kit → LangGraph workflow system.
 
+## 🎬 Watch the Demo
+
+**Live recording**: https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi
+
+[![asciicast](https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi.svg)](https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi)
+
 ## 📁 Contents
 
 - **`mock-acpctl.py`** - Mock CLI implementation that simulates all acpctl commands without implementing actual LangGraph agents
@@ -19,13 +25,15 @@ asciinema play demo/acpctl-demo.cast
 
 Press `Space` to pause/resume, `q` to quit.
 
-### Option 2: Upload to asciinema.org
+### Option 2: View on asciinema.org
+
+View the uploaded recording at: https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi
+
+To upload a new version:
 
 ```bash
 asciinema upload demo/acpctl-demo.cast
 ```
-
-This will give you a shareable URL that can be embedded in documentation.
 
 ### Option 3: Convert to GIF
 
@@ -42,10 +50,8 @@ agg demo/acpctl-demo.cast demo/acpctl-demo.gif
 For GitHub/GitLab markdown:
 
 ```markdown
-[![asciicast](https://asciinema.org/a/XXXXX.svg)](https://asciinema.org/a/XXXXX)
+[![asciicast](https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi.svg)](https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi)
 ```
-
-(Replace XXXXX with the ID from `asciinema upload`)
 
 ## 🎯 What the Demo Shows
 

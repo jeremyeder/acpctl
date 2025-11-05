@@ -45,7 +45,7 @@ Built for **Red Hat AI Engineering** workflows, designed to be governed, auditab
 
 See the proposed acpctl user experience in action:
 
-[![asciicast](https://asciinema.org/a/placeholder.svg)](demo/acpctl-demo.cast)
+[![asciicast](https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi.svg)](https://asciinema.org/a/OWR3Vroa0ie2pytj9HHY5qNWi)
 
 ```bash
 # Watch the recorded demo locally
