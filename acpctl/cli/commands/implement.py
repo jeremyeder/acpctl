@@ -198,13 +198,16 @@ def implement_command(
 
     # Load checkpoint
     checkpoint_path = Path(acp_dir) / "state" / f"{feature_id}.json"
+    checkpoint_state = None
+    checkpoint_metadata = None
+
     if checkpoint_path.exists():
         try:
-            checkpoint_data = load_checkpoint(str(checkpoint_path))
+            checkpoint_state, checkpoint_metadata = load_checkpoint(str(checkpoint_path))
             config.print_details(f"[dim]Loaded checkpoint from {checkpoint_path}[/dim]")
 
             # Check if implementation already done
-            phases_completed = checkpoint_data.get("phases_completed", [])
+            phases_completed = checkpoint_metadata.phases_completed
             if "implement" in phases_completed or "implementation" in phases_completed:
                 config.print_warning(
                     f"Implementation already completed for feature '{feature_id}'"
@@ -217,11 +220,31 @@ def implement_command(
                     config.print_progress("Implementation cancelled")
                     raise typer.Exit(0)
 
+        except FileNotFoundError:
+            # No checkpoint exists - this is expected for new features
+            config.print_details("[dim]No existing checkpoint found[/dim]")
+        except ValueError as e:
+            # Checkpoint validation failed - likely corrupted or incompatible
+            config.print_error(
+                f"Checkpoint file is corrupted or incompatible: {e}\n"
+                f"This may happen when switching between --mock and non-mock modes.\n"
+                f"\nTo fix (choose one):\n"
+                f"  1. Run with {'--mock' if not mock else 'non-mock'} mode\n"
+                f"  2. Delete checkpoint: rm {checkpoint_path}\n"
+                f"  3. Start fresh: acpctl specify \"description\""
+            )
+            raise typer.Exit(1)
         except Exception as e:
-            config.print_warning(f"Could not load checkpoint: {e}")
-            checkpoint_data = None
+            # Unexpected error
+            config.print_error(
+                f"Unexpected error loading checkpoint: {e}\n"
+                f"Checkpoint path: {checkpoint_path}"
+            )
+            if config.is_verbose():
+                import traceback
+                traceback.print_exc()
+            raise typer.Exit(1)
     else:
-        checkpoint_data = None
         config.print_details("[dim]No existing checkpoint found[/dim]")
 
     # Load constitution
@@ -233,9 +256,9 @@ def implement_command(
         raise typer.Exit(1)
 
     # Initialize state
-    if checkpoint_data:
+    if checkpoint_state:
         # Resume from checkpoint
-        initial_state = checkpoint_data["state"]
+        initial_state = checkpoint_state
         # Ensure we have plan
         if not initial_state.get("plan"):
             initial_state["plan"] = plan_content
@@ -247,12 +270,32 @@ def implement_command(
         # Reset governance for new phase
         initial_state["governance_passes"] = False
     else:
-        # Create new state
+        # Create new state - need to read spec to get required fields
+        spec_content = ""
+        feature_description = feature_id  # Fallback to feature_id
+
+        spec_path = feature_dir / "spec.md"
+        if spec_path.exists():
+            try:
+                spec_content = spec_path.read_text()
+                config.print_details(f"[dim]Loaded spec from {spec_path}[/dim]")
+
+                # Try to extract feature description from spec
+                for line in spec_content.split('\n'):
+                    if line.startswith('# ') and 'Feature:' in line:
+                        feature_description = line.split('Feature:')[-1].strip()
+                        break
+            except Exception as e:
+                config.print_warning(f"Could not load spec: {e}")
+
+        # Create new state with all required fields for plan phase
         from acpctl.core.state import create_test_state
 
         initial_state = create_test_state(
             phase="plan",  # Coming from planning phase
             constitution=constitution,
+            spec=spec_content if spec_content else "Generated from plan artifacts",
+            feature_description=feature_description,
             plan=plan_content,
             data_model=data_model_content,
             governance_passes=True,  # Plan phase passed
@@ -326,10 +369,10 @@ def implement_command(
     # Save checkpoint
     try:
         # Update checkpoint metadata
-        if checkpoint_data:
-            feature_name = checkpoint_data.get("feature_name", feature_id)
-            thread_id = checkpoint_data.get("thread_id", "implement_" + feature_id)
-            existing_phases = checkpoint_data.get("phases_completed", [])
+        if checkpoint_metadata:
+            feature_name = checkpoint_metadata.feature_name or feature_id
+            thread_id = checkpoint_metadata.thread_id
+            existing_phases = checkpoint_metadata.phases_completed
         else:
             feature_name = feature_id
             thread_id = "implement_" + feature_id
